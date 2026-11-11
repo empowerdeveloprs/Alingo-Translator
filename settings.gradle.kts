@@ -12,5 +12,6 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "AlingoTranslate"
+
+rootProject.name = "AlingoTranslator"
 include(":app")

@@ -22,15 +22,19 @@ jobs:
         with:
           packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
 
+      # اگر gradlew موجود نہیں ہے تو خود بخود ڈاؤن لوڈ کریں
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.4
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       - name: Build Debug APK
-        run: |
-          chmod +x gradlew || true
-          gradle wrapper --gradle-version 8.4
-          ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AlinGo-Translator-APK
+          name: AlinGo-Translate-APK
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
