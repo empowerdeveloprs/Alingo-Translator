@@ -13,19 +13,14 @@ import android.view.WindowManager
 import android.widget.TextView
 import kotlin.math.abs
 
-data class TranslationOverlay(
-    val text: String,
-    val x: Int,
-    val y: Int,
-    val width: Int,
-    val height: Int
-)
+data class TranslationOverlay(val text: String, val x: Int, val y: Int, val width: Int, val height: Int)
 
 class OverlayManager(private val context: Context) {
     private var windowManager: WindowManager? = null
     private var floatingBall: TextView? = null
     private var ballParams: WindowManager.LayoutParams? = null
     private val translationViews = mutableListOf<TextView>()
+    private var ttsManager: TtsManager? = null
 
     var onBallClicked: (() -> Unit)? = null
 
@@ -33,6 +28,7 @@ class OverlayManager(private val context: Context) {
     fun showFloatingBall() {
         if (floatingBall != null) return
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        ttsManager = TtsManager(context)
 
         floatingBall = TextView(context).apply {
             text = "A"
@@ -57,29 +53,22 @@ class OverlayManager(private val context: Context) {
         }
 
         floatingBall?.setOnTouchListener(object : View.OnTouchListener {
-            private var initialX = 0
-            private var initialY = 0
-            private var initialTouchX = 0f
-            private var initialTouchY = 0f
+            private var initialX = 0; private var initialY = 0
+            private var initialTouchX = 0f; private var initialTouchY = 0f
             private var isDragging = false
 
             override fun onTouch(v: View, event: MotionEvent): Boolean {
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        initialX = ballParams!!.x
-                        initialY = ballParams!!.y
-                        initialTouchX = event.rawX
-                        initialTouchY = event.rawY
-                        isDragging = false
-                        return true
+                        initialX = ballParams!!.x; initialY = ballParams!!.y
+                        initialTouchX = event.rawX; initialTouchY = event.rawY
+                        isDragging = false; return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        if (abs(event.rawX - initialTouchX) > 10 || abs(event.rawY - initialTouchY) > 10)
-                            isDragging = true
+                        if (abs(event.rawX - initialTouchX) > 10 || abs(event.rawY - initialTouchY) > 10) isDragging = true
                         ballParams!!.x = initialX + (event.rawX - initialTouchX).toInt()
                         ballParams!!.y = initialY + (event.rawY - initialTouchY).toInt()
-                        windowManager?.updateViewLayout(floatingBall, ballParams)
-                        return true
+                        windowManager?.updateViewLayout(floatingBall, ballParams); return true
                     }
                     MotionEvent.ACTION_UP -> {
                         if (!isDragging) onBallClicked?.invoke()
@@ -89,17 +78,12 @@ class OverlayManager(private val context: Context) {
                 return false
             }
         })
-
         windowManager?.addView(floatingBall, ballParams)
     }
 
-    /**
-     * اصل ٹیکسٹ کے ہر بلاک (جملے) کے بالکل اوپر بولڈ فونٹ میں ترجمہ چسپاں کریں۔
-     */
-    fun showTranslationBlocks(blocks: List<TranslationOverlay>) {
+    fun showTranslationBlocks(blocks: List<TranslationOverlay>, targetLangCode: String) {
         val wm = windowManager ?: return
         clearTranslationBlocks()
-
         val density = context.resources.displayMetrics.density
 
         blocks.forEach { block ->
@@ -108,29 +92,28 @@ class OverlayManager(private val context: Context) {
             val tv = TextView(context).apply {
                 text = block.text
                 setTextColor(Color.WHITE)
-                // بولڈ فونٹ
                 setTypeface(Typeface.DEFAULT_BOLD, Typeface.BOLD)
-                // نیم شفاف سیاہ پس منظر تاکہ اصل ٹیکسٹ چھپ جائے
                 setBackgroundColor(Color.parseColor("#E6000000"))
                 setPadding(8, 6, 8, 6)
                 gravity = Gravity.CENTER
-                // سائز باکس کی اونچائی کے مطابق
                 val sizeSp = (block.height / density * 0.55f).coerceIn(10f, 22f)
                 textSize = sizeSp
                 maxLines = 4
+                
+                // ٹیپ کرنے پر آواز سنائیں
+                setOnClickListener {
+                    ttsManager?.speak(block.text, targetLangCode)
+                }
             }
 
             val params = WindowManager.LayoutParams(
-                block.width,
-                block.height,
+                block.width, block.height,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                x = block.x
-                y = block.y
+                x = block.x; y = block.y
             }
 
             try {
@@ -142,9 +125,7 @@ class OverlayManager(private val context: Context) {
 
     fun clearTranslationBlocks() {
         val wm = windowManager ?: return
-        translationViews.forEach {
-            try { wm.removeView(it) } catch (_: Exception) {}
-        }
+        translationViews.forEach { try { wm.removeView(it) } catch (_: Exception) {} }
         translationViews.clear()
     }
 
@@ -152,5 +133,6 @@ class OverlayManager(private val context: Context) {
         floatingBall?.let { try { windowManager?.removeView(it) } catch (_: Exception) {} }
         floatingBall = null
         clearTranslationBlocks()
+        ttsManager?.shutdown()
     }
 }

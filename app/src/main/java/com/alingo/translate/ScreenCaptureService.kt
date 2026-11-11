@@ -29,7 +29,6 @@ class ScreenCaptureService : Service() {
     private var imageReader: ImageReader? = null
     private var overlayManager: OverlayManager? = null
 
-    // ہم اسکرین کو آدھی ریزولوشن پر پکڑیں گے (تیز رفتار کے لیے)
     private val scaleFactor = 2
     private var isProcessing = false
 
@@ -105,9 +104,21 @@ class ScreenCaptureService : Service() {
     }
 
     private fun translateBlocks(blocks: List<com.google.mlkit.vision.text.Text.TextBlock>) {
+        val sourceCode = SettingsManager.getSourceLang(this)
+        val targetCode = SettingsManager.getTargetLang(this)
+
+        val mlSource = toMlKitCode(sourceCode)
+        val mlTarget = toMlKitCode(targetCode)
+
+        if (mlSource == null || mlTarget == null) {
+            // اگر زبان ML Kit میں نہیں ہے (سندھی، پشتو وغیرہ)
+            isProcessing = false
+            return
+        }
+
         val options = TranslatorOptions.Builder()
-            .setSourceLanguage(TranslateLanguage.ENGLISH)
-            .setTargetLanguage(TranslateLanguage.URDU)
+            .setSourceLanguage(mlSource)
+            .setTargetLanguage(mlTarget)
             .build()
         val translator = Translation.getClient(options)
 
@@ -131,19 +142,38 @@ class ScreenCaptureService : Service() {
                         )
                         completed++
                         if (completed == total) {
-                            overlayManager?.showTranslationBlocks(results)
+                            overlayManager?.showTranslationBlocks(results, targetCode)
                             isProcessing = false
                         }
                     }
                     .addOnFailureListener {
                         completed++
                         if (completed == total) {
-                            overlayManager?.showTranslationBlocks(results)
+                            overlayManager?.showTranslationBlocks(results, targetCode)
                             isProcessing = false
                         }
                     }
             }
         }.addOnFailureListener { isProcessing = false }
+    }
+
+    private fun toMlKitCode(langCode: String): String? {
+        return when (langCode) {
+            "en" -> TranslateLanguage.ENGLISH
+            "ur" -> TranslateLanguage.URDU
+            "hi" -> TranslateLanguage.HINDI
+            "bn" -> TranslateLanguage.BENGALI
+            "pa" -> TranslateLanguage.valueOf("PUNJABI")
+            "gu" -> TranslateLanguage.valueOf("GUJARATI")
+            "ta" -> TranslateLanguage.valueOf("TAMIL")
+            "te" -> TranslateLanguage.valueOf("TELUGU")
+            "kn" -> TranslateLanguage.valueOf("KANNADA")
+            "ml" -> TranslateLanguage.valueOf("MALAYALAM")
+            "mr" -> TranslateLanguage.valueOf("MARATHI")
+            "ne" -> TranslateLanguage.valueOf("NEPALI")
+            "si" -> TranslateLanguage.valueOf("SINHALA")
+            else -> null
+        }
     }
 
     private fun startForegroundService() {
@@ -152,7 +182,7 @@ class ScreenCaptureService : Service() {
         manager.createNotificationChannel(channel)
         val notification = Notification.Builder(this, "AlinGoChannel")
             .setContentTitle("AlinGo Translate")
-            .setContentText("Tap floating ball to translate screen")
+            .setContentText("Tap floating ball to translate")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .build()
         startForeground(1, notification)

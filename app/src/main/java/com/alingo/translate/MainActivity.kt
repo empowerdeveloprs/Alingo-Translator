@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity() {
                 putExtra("DATA", result.data)
             }
             startForegroundService(intent)
+            finish()
         }
     }
 
@@ -43,33 +44,37 @@ class MainActivity : AppCompatActivity() {
         }
 
         val subtitle = TextView(this).apply {
-            text = "پاکستان، انڈیا، بنگلہ دیش کی 15+ علاقائی زبانیں"
+            text = "Tap floating 'A' button on screen to translate."
             textSize = 16f
             setPadding(0, 0, 0, 40)
         }
 
         val btnDict = Button(this).apply {
-            text = "📖 ڈکشنری کھولیں (لفظ کا ترجمہ + تلفظ)"
+            text = "📖 Dictionary (Offline)"
             setOnClickListener { startActivity(Intent(this@MainActivity, DictionaryScreen::class.java)) }
         }
 
+        val btnSettings = Button(this).apply {
+            text = "⚙️ Settings (Language Selection)"
+            setOnClickListener { startActivity(Intent(this@MainActivity, SettingsScreen::class.java)) }
+        }
+
         val btnOverlay = Button(this).apply {
-            text = "1️⃣ اوورلے کی اجازت دیں"
+            text = "1️⃣ Allow Overlay Permission"
             setOnClickListener {
                 if (!Settings.canDrawOverlays(this@MainActivity)) {
-                    startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:$packageName")))
+                    startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
                 }
             }
         }
 
         val btnStart = Button(this).apply {
-            text = "2️⃣ اسکرین کیپچر + ترجمہ شروع کریں"
+            text = "2️⃣ Start Screen Translator"
             setOnClickListener {
                 if (Settings.canDrawOverlays(this@MainActivity)) {
                     captureLauncher.launch(mediaProjectionManager.createScreenCaptureIntent())
                 } else {
-                    title.text = "⚠️ پہلے اوورلے کی اجازت دیں!"
+                    title.text = "⚠️ Allow overlay permission first!"
                 }
             }
         }
@@ -77,6 +82,7 @@ class MainActivity : AppCompatActivity() {
         layout.addView(title)
         layout.addView(subtitle)
         layout.addView(btnDict)
+        layout.addView(btnSettings)
         layout.addView(TextView(this).apply { text = "\n\n" })
         layout.addView(btnOverlay)
         layout.addView(btnStart)
