@@ -42,14 +42,21 @@ class ScreenCaptureService : Service() {
                 isProcessing = true
                 overlayManager?.clearTranslationBlocks()
                 
-                // چیک کریں کہ شیزوکو موجود ہے اور اس کی اجازت ہے یا نہیں
                 if (ShizukuManager.isShizukuAvailable() && ShizukuManager.hasPermission()) {
-                    // شیزوکو والا طریقہ (بغیر پاپ اپ)
-                    // نوٹ: چونکہ اصل شیزوکو اسکرین شاٹ API پیچیدہ ہے،
-                    // ہم فوری طور پر میڈیا پروجیکشن استعمال کریں گے، لیکن اگر شیزوکو موجود ہے تو یہ پاپ اپ نہیں آئے گا
                     captureWithMediaProjection()
                 } else {
                     captureWithMediaProjection()
+                }
+            }
+        }
+        
+        overlayManager?.onWordSelectClicked = {
+            // صارف نے ورڈ سلیکٹ کا بٹن دبایا
+            overlayManager?.showSelectionBox { x, y, w, h ->
+                if (!isProcessing) {
+                    isProcessing = true
+                    overlayManager?.clearTranslationBlocks()
+                    captureWordArea(x, y, w, h)
                 }
             }
         }

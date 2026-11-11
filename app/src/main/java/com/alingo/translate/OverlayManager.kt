@@ -26,6 +26,8 @@ class OverlayManager(private val context: Context) {
     private var ttsManager: TtsManager? = null
 
     var onBallClicked: (() -> Unit)? = null
+    var onWordSelectClicked: (() -> Unit)? = null
+    private var wordSelectButton: TextView? = null
 
     @SuppressLint("ClickableViewAccessibility")
     fun showFloatingBall() {
@@ -78,7 +80,129 @@ class OverlayManager(private val context: Context) {
                 return false
             }
         })
+        // ورڈ سلیکٹ کا چھوٹا بٹن
+        wordSelectButton = TextView(context).apply {
+            text = "🔍"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            val bg = GradientDrawable()
+            bg.shape = GradientDrawable.OVAL
+            bg.setColor(Color.parseColor("#FFD700")) // سنہری
+            this.background = bg
+            setOnClickListener { onWordSelectClicked?.invoke() }
+        }
+
+        val wordParams = WindowManager.LayoutParams(
+            100, 100,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 100; y = 440 // بٹن کے نیچے
+        }
+        
+        wordSelectButton?.let { wmView ->
+            val wm = windowManager
+            wm?.addView(wmView, wordParams)
+            // اسے بھی ڈریگ کرنے کے قابل بنائیں
+            wmView.setOnTouchListener(object : View.OnTouchListener {
+                private var initialX = 0
+                private var initialY = 0
+                private var initialTouchX = 0f
+                private var initialTouchY = 0f
+                private var isDragging = false
+
+                override fun onTouch(v: View, event: MotionEvent): Boolean {
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> {
+                            initialX = wordParams.x; initialY = wordParams.y
+                            initialTouchX = event.rawX; initialTouchY = event.rawY
+                            isDragging = false; return true
+                        }
+                        MotionEvent.ACTION_MOVE -> {
+                            if (abs(event.rawX - initialTouchX) > 10 || abs(event.rawY - initialTouchY) > 10) isDragging = true
+                            wordParams.x = initialX + (event.rawX - initialTouchX).toInt()
+                            wordParams.y = initialY + (event.rawY - initialTouchY).toInt()
+                            wm?.updateViewLayout(wmView, wordParams); return true
+                        }
+                        MotionEvent.ACTION_UP -> {
+                            if (!isDragging) v.performClick()
+                            return true
+                        }
+                    }
+                    return false
+                }
+            })
+        }
         windowManager?.addView(floatingBall, ballParams)
+    }
+
+    /**
+     * الفاظ منتخب کرنے کے لیے ایک باکس دکھائیں
+     */
+    fun showSelectionBox(onSelected: (x: Int, y: Int, w: Int, h: Int) -> Unit) {
+        val wm = windowManager ?: return
+        clearTranslationBlocks()
+
+        val density = context.resources.displayMetrics.density
+        val boxSize = (120 * density).toInt() // 120dp کا باکس
+
+        val selectionView = android.widget.FrameLayout(context).apply {
+            setBackgroundColor(Color.parseColor("#8000C853")) // نیم شفاف سبز رنگ
+            // ایک سنہری بارڈر
+            val border = GradientDrawable()
+            border.setStroke(4, Color.parseColor("#FFD700"))
+            border.cornerRadius = 10f
+            background = border
+        }
+
+        val params = WindowManager.LayoutParams(
+            boxSize, boxSize,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 200; y = 400
+        }
+
+        // باکس کو ڈریگ کرنے کا لاجک
+        selectionView.setOnTouchListener(object : View.OnTouchListener {
+            private var initialX = 0
+            private var initialY = 0
+            private var initialTouchX = 0f
+            private var initialTouchY = 0f
+
+            override fun onTouch(v: View, event: MotionEvent): Boolean {
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        initialX = params.x
+                        initialY = params.y
+                        initialTouchX = event.rawX
+                        initialTouchY = event.rawY
+                        return true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        params.x = initialX + (event.rawX - initialTouchX).toInt()
+                        params.y = initialY + (event.rawY - initialTouchY).toInt()
+                        wm.updateViewLayout(selectionView, params)
+                        return true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        // جب صارف انگلی اٹھائے تو منتخب شدہ حصہ بھیجیں
+                        onSelected(params.x, params.y, params.width, params.height)
+                        wm.removeView(selectionView)
+                        return true
+                    }
+                }
+                return false
+            }
+        })
+
+        wm.addView(selectionView, params)
     }
 
     fun showTranslationBlocks(blocks: List<TranslationOverlay>, targetLangCode: String) {
