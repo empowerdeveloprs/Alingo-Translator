@@ -55,8 +55,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         val btnSettings = Button(this).apply {
-            text = "⚙️ Settings (Language Selection)"
+            text = "⚙️ Settings (Language & Appearance)"
             setOnClickListener { startActivity(Intent(this@MainActivity, SettingsScreen::class.java)) }
+        }
+
+        val btnHistory = Button(this).apply {
+            text = "🕒 Translation History"
+            setOnClickListener { startActivity(Intent(this@MainActivity, HistoryScreen::class.java)) }
         }
 
         val btnOverlay = Button(this).apply {
@@ -83,6 +88,7 @@ class MainActivity : AppCompatActivity() {
         layout.addView(subtitle)
         layout.addView(btnDict)
         layout.addView(btnSettings)
+        layout.addView(btnHistory)
         layout.addView(TextView(this).apply { text = "\n\n" })
         layout.addView(btnOverlay)
         layout.addView(btnStart)

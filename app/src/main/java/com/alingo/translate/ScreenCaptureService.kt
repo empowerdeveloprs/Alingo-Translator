@@ -143,6 +143,9 @@ class ScreenCaptureService : Service() {
                         completed++
                         if (completed == total) {
                             overlayManager?.showTranslationBlocks(results, targetCode)
+                            if (results.isNotEmpty()) {
+                                HistoryManager.addToHistory(this, results.joinToString(" ") { it.text }, results.joinToString(" ") { it.text })
+                            }
                             isProcessing = false
                         }
                     }
@@ -150,6 +153,9 @@ class ScreenCaptureService : Service() {
                         completed++
                         if (completed == total) {
                             overlayManager?.showTranslationBlocks(results, targetCode)
+                            if (results.isNotEmpty()) {
+                                HistoryManager.addToHistory(this, results.joinToString(" ") { it.text }, results.joinToString(" ") { it.text })
+                            }
                             isProcessing = false
                         }
                     }

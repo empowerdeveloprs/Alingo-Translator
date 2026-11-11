@@ -1,6 +1,8 @@
 package com.alingo.translate
 
 import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -11,6 +13,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
+import android.widget.Toast
 import kotlin.math.abs
 
 data class TranslationOverlay(val text: String, val x: Int, val y: Int, val width: Int, val height: Int)
@@ -84,7 +87,13 @@ class OverlayManager(private val context: Context) {
     fun showTranslationBlocks(blocks: List<TranslationOverlay>, targetLangCode: String) {
         val wm = windowManager ?: return
         clearTranslationBlocks()
+        
         val density = context.resources.displayMetrics.density
+        val fontScale = SettingsManager.getFontScale(context)
+        val bgOpacity = SettingsManager.getBgOpacity(context)
+        
+        // Hex color with dynamic alpha for background
+        val bgColor = Color.argb(bgOpacity, 0, 0, 0) // Black with custom transparency
 
         blocks.forEach { block ->
             if (block.text.isBlank()) return@forEach
@@ -93,16 +102,27 @@ class OverlayManager(private val context: Context) {
                 text = block.text
                 setTextColor(Color.WHITE)
                 setTypeface(Typeface.DEFAULT_BOLD, Typeface.BOLD)
-                setBackgroundColor(Color.parseColor("#E6000000"))
+                setBackgroundColor(bgColor) // اپلائی کیا گیا شفاف رنگ
                 setPadding(8, 6, 8, 6)
                 gravity = Gravity.CENTER
-                val sizeSp = (block.height / density * 0.55f).coerceIn(10f, 22f)
-                textSize = sizeSp
-                maxLines = 4
                 
-                // ٹیپ کرنے پر آواز سنائیں
+                // اپلائی کیا گیا فونٹ سائز
+                val baseSizeSp = (block.height / density * 0.55f).coerceIn(10f, 22f)
+                textSize = baseSizeSp * fontScale
+                maxLines = 6
+                
+                // ٹیپ پر آواز
                 setOnClickListener {
                     ttsManager?.speak(block.text, targetLangCode)
+                }
+
+                // لانگ پریس پر کاپی
+                setOnLongClickListener {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    val clip = ClipData.newPlainText("AlinGo Translation", block.text)
+                    clipboard.setPrimaryClip(clip)
+                    Toast.makeText(context, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
+                    true
                 }
             }
 
