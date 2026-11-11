@@ -4,10 +4,7 @@ import android.content.Context
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
 data class DictionaryResult(
@@ -59,10 +56,10 @@ class DictionaryEngine(private val context: Context) {
 
     private fun toMlKitCode(langCode: String): String? {
         return when (langCode) {
-            "en" -> TranslateLanguage.ENGLISH; "ur" -> TranslateLanguage.URDU
-            "hi" -> TranslateLanguage.HINDI; "bn" -> TranslateLanguage.BENGALI
-            "pa" -> "pa"; "gu" -> "gu"; "ta" -> "ta"; "te" -> "te"
-            "kn" -> "kn"; "ml" -> "ml"; "mr" -> "mr"; "ne" -> "ne"; "si" -> "si"
+            "en" -> TranslateLanguage.ENGLISH
+            "ur" -> TranslateLanguage.URDU
+            "hi" -> TranslateLanguage.HINDI
+            "bn" -> TranslateLanguage.BENGALI
             else -> null
         }
     }
