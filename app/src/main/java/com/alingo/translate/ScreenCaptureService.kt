@@ -41,17 +41,11 @@ class ScreenCaptureService : Service() {
             if (!isProcessing) {
                 isProcessing = true
                 overlayManager?.clearTranslationBlocks()
-                
-                if (ShizukuManager.isShizukuAvailable() && ShizukuManager.hasPermission()) {
-                    captureWithMediaProjection()
-                } else {
-                    captureWithMediaProjection()
-                }
+                captureScreen()
             }
         }
         
         overlayManager?.onWordSelectClicked = {
-            // صارف نے ورڈ سلیکٹ کا بٹن دبایا
             overlayManager?.showSelectionBox { x, y, w, h ->
                 if (!isProcessing) {
                     isProcessing = true
@@ -60,39 +54,28 @@ class ScreenCaptureService : Service() {
                 }
             }
         }
-        overlayManager?.onWordSelectClicked = {
-            overlayManager?.showWordSelectorBox { x, y, w, h ->
-                if (!isProcessing) {
-                    isProcessing = true
-                    overlayManager?.clearTranslationBlocks()
-                    captureWordArea(x, y, w, h)
-                }
-            }
-        }
+        
         overlayManager?.showFloatingBall()
 
-        // اگر میڈیا پروجیکشن کی اجازت پہلے سے موجود ہے
-        setupMediaProjection(intent)
+        // صرف میڈیا پروجیکشن سیٹ اپ کریں اگر شیزوکو موجود نہیں ہے
+        if (!ShizukuManager.isShizukuAvailable() || !ShizukuManager.hasPermission()) {
+            setupMediaProjection(intent)
+        }
 
         return START_NOT_STICKY
     }
 
-    private fun setupMediaProjection(intent: Intent?) {
-        val resultCode = intent?.getIntExtra("RESULT_CODE", 0) ?: 0
-        val data = intent?.getParcelableExtra<Intent>("DATA")
-        val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-
-        if (data != null) {
-            mediaProjection = mpm.getMediaProjection(resultCode, data)
-            setupVirtualDisplay()
+    private fun captureScreen() {
+        // پہلے شیزوکو چیک کریں
+        if (ShizukuManager.isShizukuAvailable() && ShizukuManager.hasPermission()) {
+            val bitmap = ShizukuManager.takeScreenshot()
+            if (bitmap != null) {
+                processImage(bitmap)
+                return
+            }
         }
-    }
 
-    private fun captureWithMediaProjection() {
-        if (imageReader == null) {
-            isProcessing = false
-            return
-        }
+        // اگر شیزوکو نہیں ہے تو میڈیا پروجیکشن استعمال کریں
         val image = imageReader?.acquireLatestImage()
         if (image == null) { isProcessing = false; return }
 
@@ -103,24 +86,49 @@ class ScreenCaptureService : Service() {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.copyPixelsFromBuffer(buffer)
         image.close()
-
         processImage(bitmap)
     }
 
-    private fun setupVirtualDisplay() {
-        val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val metrics = DisplayMetrics()
-        wm.defaultDisplay.getRealMetrics(metrics)
+    private fun captureWordArea(x: Int, y: Int, w: Int, h: Int) {
+        var fullBitmap: Bitmap? = null
 
-        val width = metrics.widthPixels / scaleFactor
-        val height = metrics.heightPixels / scaleFactor
+        if (ShizukuManager.isShizukuAvailable() && ShizukuManager.hasPermission()) {
+            fullBitmap = ShizukuManager.takeScreenshot()
+        } else {
+            val image = imageReader?.acquireLatestImage()
+            if (image != null) {
+                val width = image.width
+                val height = image.height
+                val planes = image.planes
+                val buffer = planes[0].buffer
+                fullBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                fullBitmap.copyPixelsFromBuffer(buffer)
+                image.close()
+            }
+        }
 
-        imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
-        virtualDisplay = mediaProjection?.createVirtualDisplay(
-            "AlinGoCapture", width, height, metrics.densityDpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader?.surface, null, null
-        )
+        if (fullBitmap == null) { isProcessing = false; return }
+
+        val scale = if (ShizukuManager.isShizukuAvailable()) 1f else scaleFactor.toFloat()
+        val cropX = (x / scale).toInt().coerceIn(0, fullBitmap.width - 1)
+        val cropY = (y / scale).toInt().coerceIn(0, fullBitmap.height - 1)
+        val cropW = (w / scale).toInt().coerceIn(1, fullBitmap.width - cropX)
+        val cropH = (h / scale).toInt().coerceIn(1, fullBitmap.height - cropY)
+
+        val croppedBitmap = Bitmap.createBitmap(fullBitmap, cropX, cropY, cropW, cropH)
+        
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        recognizer.process(InputImage.fromBitmap(croppedBitmap, 0))
+            .addOnSuccessListener { visionText ->
+                val text = visionText.text.trim()
+                if (text.isEmpty()) {
+                    overlayManager?.showTranslationBlocks(listOf(TranslationOverlay("No text found", x, y, w, h)), "ur")
+                    isProcessing = false
+                    return@addOnSuccessListener
+                }
+                translateSingleWord(text, x, y, w, h)
+            }
+            .addOnFailureListener { isProcessing = false }
     }
 
     private fun processImage(bitmap: Bitmap) {
@@ -148,11 +156,13 @@ class ScreenCaptureService : Service() {
             val results = mutableListOf<TranslationOverlay>()
             var completed = 0
             val total = blocks.size
+            val scale = if (ShizukuManager.isShizukuAvailable()) 1 else scaleFactor
+
             blocks.forEach { block ->
                 val rect = block.boundingBox!!
                 translator.translate(block.text)
                     .addOnSuccessListener { translated ->
-                        results.add(TranslationOverlay(translated, rect.left * scaleFactor, rect.top * scaleFactor, rect.width() * scaleFactor, rect.height() * scaleFactor))
+                        results.add(TranslationOverlay(translated, rect.left * scale, rect.top * scale, rect.width() * scale, rect.height() * scale))
                         completed++
                         if (completed == total) {
                             overlayManager?.showTranslationBlocks(results, targetCode)
@@ -168,6 +178,48 @@ class ScreenCaptureService : Service() {
                     }
             }
         }.addOnFailureListener { isProcessing = false }
+    }
+
+    private fun translateSingleWord(word: String, x: Int, y: Int, w: Int, h: Int) {
+        val targetCode = SettingsManager.getTargetLang(this)
+        val mlTarget = toMlKitCode(targetCode) ?: TranslateLanguage.URDU
+
+        val options = TranslatorOptions.Builder()
+            .setSourceLanguage(TranslateLanguage.ENGLISH)
+            .setTargetLanguage(mlTarget)
+            .build()
+        val translator = Translation.getClient(options)
+
+        translator.downloadModelIfNeeded().addOnSuccessListener {
+            translator.translate(word).addOnSuccessListener { translated ->
+                overlayManager?.showTranslationBlocks(listOf(TranslationOverlay(translated, x, y, w, h)), targetCode)
+                isProcessing = false
+            }.addOnFailureListener { isProcessing = false }
+        }.addOnFailureListener { isProcessing = false }
+    }
+
+    private fun setupMediaProjection(intent: Intent?) {
+        val resultCode = intent?.getIntExtra("RESULT_CODE", 0) ?: 0
+        val data = intent?.getParcelableExtra<Intent>("DATA")
+        val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+
+        if (data != null) {
+            mediaProjection = mpm.getMediaProjection(resultCode, data)
+            
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val metrics = DisplayMetrics()
+            wm.defaultDisplay.getRealMetrics(metrics)
+
+            val width = metrics.widthPixels / scaleFactor
+            val height = metrics.heightPixels / scaleFactor
+
+            imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+            virtualDisplay = mediaProjection?.createVirtualDisplay(
+                "AlinGoCapture", width, height, metrics.densityDpi,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader?.surface, null, null
+            )
+        }
     }
 
     private fun toMlKitCode(langCode: String): String? {
