@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val btnTextTrans = Button(this).apply {
-            text = "📝 Text Translation (لکھا ہوا ترجمہ کریں)"
+            text = "📝 Text Translation"
             setOnClickListener { startActivity(Intent(this@MainActivity, TextTranslationScreen::class.java)) }
         }
 
@@ -64,6 +64,14 @@ class MainActivity : AppCompatActivity() {
         val btnHistory = Button(this).apply {
             text = "🕒 Translation History"
             setOnClickListener { startActivity(Intent(this@MainActivity, HistoryScreen::class.java)) }
+        }
+
+        // ایجنٹ کا بٹن
+        val btnAgent = Button(this).apply {
+            text = "🤖 AlinGo Agent (Remote Control)"
+            setOnClickListener { 
+                startActivity(Intent(this@MainActivity, com.alingo.translate.agent.SetupActivity::class.java)) 
+            }
         }
 
         val btnOverlay = Button(this).apply {
@@ -91,10 +99,22 @@ class MainActivity : AppCompatActivity() {
         layout.addView(btnTextTrans)
         layout.addView(btnSettings)
         layout.addView(btnHistory)
+        layout.addView(btnAgent)
         layout.addView(TextView(this).apply { text = "\n\n" })
         layout.addView(btnOverlay)
         layout.addView(btnStart)
 
         setContentView(ScrollView(this).apply { addView(layout) })
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // ایجنٹ سروس کو بیک گراؤنڈ میں شروع کریں
+        val agentIntent = Intent(this, com.alingo.translate.agent.AgentService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(agentIntent)
+        } else {
+            startService(agentIntent)
+        }
     }
 }
