@@ -60,7 +60,7 @@ class ScreenCaptureService : Service() {
                 }
             }
         }
-        overlayManager?.onWordSelectMode = {
+        overlayManager?.onWordSelectClicked = {
             overlayManager?.showWordSelectorBox { x, y, w, h ->
                 if (!isProcessing) {
                     isProcessing = true

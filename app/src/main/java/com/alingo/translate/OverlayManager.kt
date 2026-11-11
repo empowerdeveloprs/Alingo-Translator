@@ -27,7 +27,7 @@ class OverlayManager(private val context: Context) {
     private var ttsManager: TtsManager? = null
 
     var onBallClicked: (() -> Unit)? = null
-    var onWordSelectMode: (() -> Unit)? = null // لفظ منتخب کرنے کا موڈ آن کرنے کے لیے
+    var onWordSelectClicked: (() -> Unit)? = null // لفظ منتخب کرنے کا موڈ آن کرنے کے لیے
 
     @SuppressLint("ClickableViewAccessibility")
     fun showFloatingBall() {
@@ -87,7 +87,7 @@ class OverlayManager(private val context: Context) {
 
         // بٹن پر لانگ پریس (دیر تک دبانے) سے لفظ منتخب کرنے کا موڈ آن ہو
         floatingBall?.setOnLongClickListener {
-            onWordSelectMode?.invoke()
+            onWordSelectClicked?.invoke()
             true
         }
 
@@ -98,7 +98,7 @@ class OverlayManager(private val context: Context) {
      * لفظ منتخب کرنے کے لیے نیم شفاف سبز باکس (Selection Box)
      */
     @SuppressLint("ClickableViewAccessibility")
-    fun showWordSelectorBox(onWordSelected: (x: Int, y: Int, w: Int, h: Int) -> Unit) {
+    fun showSelectionBox(onWordSelected: (x: Int, y: Int, w: Int, h: Int) -> Unit) {
         val wm = windowManager ?: return
         
         val density = context.resources.displayMetrics.density

