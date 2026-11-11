@@ -40,30 +40,20 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_HORIZONTAL
         }
 
-        // لوگو یہاں دکھائیں گے
         val logoImage = ImageView(this).apply {
             setImageResource(R.drawable.ic_alingo_logo)
-            layoutParams = LinearLayout.LayoutParams(500, 350)
+            layoutParams = LinearLayout.LayoutParams(400, 300)
             setPadding(0, 0, 0, 20)
-        }
-
-        val title = TextView(this).apply {
-            text = "AlinGo Translate"
-            textSize = 32f
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 10)
-        }
-
-        val subtitle = TextView(this).apply {
-            text = "Tap the floating logo on screen to translate."
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 40)
         }
 
         val btnDict = Button(this).apply {
             text = "📖 Dictionary (Offline)"
             setOnClickListener { startActivity(Intent(this@MainActivity, DictionaryScreen::class.java)) }
+        }
+
+        val btnTextTrans = Button(this).apply {
+            text = "📝 Text Translation (لکھا ہوا ترجمہ کریں)"
+            setOnClickListener { startActivity(Intent(this@MainActivity, TextTranslationScreen::class.java)) }
         }
 
         val btnSettings = Button(this).apply {
@@ -91,15 +81,14 @@ class MainActivity : AppCompatActivity() {
                 if (Settings.canDrawOverlays(this@MainActivity)) {
                     captureLauncher.launch(mediaProjectionManager.createScreenCaptureIntent())
                 } else {
-                    title.text = "⚠️ Allow overlay permission first!"
+                    btnOverlay.performClick()
                 }
             }
         }
 
         layout.addView(logoImage)
-        layout.addView(title)
-        layout.addView(subtitle)
         layout.addView(btnDict)
+        layout.addView(btnTextTrans)
         layout.addView(btnSettings)
         layout.addView(btnHistory)
         layout.addView(TextView(this).apply { text = "\n\n" })

@@ -21,7 +21,11 @@ import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
+import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
+import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
 
 class ScreenCaptureService : Service() {
     private var mediaProjection: MediaProjection? = null
@@ -76,10 +80,7 @@ class ScreenCaptureService : Service() {
 
     private fun takeScreenshotAndTranslate() {
         val image = imageReader?.acquireLatestImage()
-        if (image == null) {
-            isProcessing = false
-            return
-        }
+        if (image == null) { isProcessing = false; return }
 
         val width = image.width
         val height = image.height
@@ -89,15 +90,20 @@ class ScreenCaptureService : Service() {
         bitmap.copyPixelsFromBuffer(buffer)
         image.close()
 
-        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        // OCR زبان کا انتخاب
+        val ocrLang = SettingsManager.getOcrLang(this)
+        val recognizer = when (ocrLang) {
+            "chinese" -> TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
+            "japanese" -> TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
+            "korean" -> TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
+            "devanagari" -> TextRecognition.getClient(DevanagariTextRecognizerOptions.Builder().build())
+            else -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        }
 
         recognizer.process(InputImage.fromBitmap(bitmap, 0))
             .addOnSuccessListener { visionText ->
                 val textBlocks = visionText.textBlocks.filter { it.boundingBox != null && it.text.isNotBlank() }
-                if (textBlocks.isEmpty()) {
-                    isProcessing = false
-                    return@addOnSuccessListener
-                }
+                if (textBlocks.isEmpty()) { isProcessing = false; return@addOnSuccessListener }
                 translateBlocks(textBlocks)
             }
             .addOnFailureListener { isProcessing = false }
@@ -107,14 +113,8 @@ class ScreenCaptureService : Service() {
         val sourceCode = SettingsManager.getSourceLang(this)
         val targetCode = SettingsManager.getTargetLang(this)
 
-        val mlSource = toMlKitCode(sourceCode)
-        val mlTarget = toMlKitCode(targetCode)
-
-        if (mlSource == null || mlTarget == null) {
-            // اگر زبان ML Kit میں نہیں ہے (سندھی، پشتو وغیرہ)
-            isProcessing = false
-            return
-        }
+        val mlSource = if (sourceCode == "auto" || sourceCode == "en") TranslateLanguage.ENGLISH else toMlKitCode(sourceCode) ?: TranslateLanguage.ENGLISH
+        val mlTarget = toMlKitCode(targetCode) ?: TranslateLanguage.URDU
 
         val options = TranslatorOptions.Builder()
             .setSourceLanguage(mlSource)
@@ -131,21 +131,10 @@ class ScreenCaptureService : Service() {
                 val rect = block.boundingBox!!
                 translator.translate(block.text)
                     .addOnSuccessListener { translated ->
-                        results.add(
-                            TranslationOverlay(
-                                text = translated,
-                                x = rect.left * scaleFactor,
-                                y = rect.top * scaleFactor,
-                                width = rect.width() * scaleFactor,
-                                height = rect.height() * scaleFactor
-                            )
-                        )
+                        results.add(TranslationOverlay(translated, rect.left * scaleFactor, rect.top * scaleFactor, rect.width() * scaleFactor, rect.height() * scaleFactor))
                         completed++
                         if (completed == total) {
                             overlayManager?.showTranslationBlocks(results, targetCode)
-                            if (results.isNotEmpty()) {
-                                HistoryManager.addToHistory(this, results.joinToString(" ") { it.text }, results.joinToString(" ") { it.text })
-                            }
                             isProcessing = false
                         }
                     }
@@ -153,9 +142,6 @@ class ScreenCaptureService : Service() {
                         completed++
                         if (completed == total) {
                             overlayManager?.showTranslationBlocks(results, targetCode)
-                            if (results.isNotEmpty()) {
-                                HistoryManager.addToHistory(this, results.joinToString(" ") { it.text }, results.joinToString(" ") { it.text })
-                            }
                             isProcessing = false
                         }
                     }
@@ -165,19 +151,10 @@ class ScreenCaptureService : Service() {
 
     private fun toMlKitCode(langCode: String): String? {
         return when (langCode) {
-            "en" -> TranslateLanguage.ENGLISH
-            "ur" -> TranslateLanguage.URDU
-            "hi" -> TranslateLanguage.HINDI
-            "bn" -> TranslateLanguage.BENGALI
-            "pa" -> TranslateLanguage.valueOf("PUNJABI")
-            "gu" -> TranslateLanguage.valueOf("GUJARATI")
-            "ta" -> TranslateLanguage.valueOf("TAMIL")
-            "te" -> TranslateLanguage.valueOf("TELUGU")
-            "kn" -> TranslateLanguage.valueOf("KANNADA")
-            "ml" -> TranslateLanguage.valueOf("MALAYALAM")
-            "mr" -> TranslateLanguage.valueOf("MARATHI")
-            "ne" -> TranslateLanguage.valueOf("NEPALI")
-            "si" -> TranslateLanguage.valueOf("SINHALA")
+            "en" -> TranslateLanguage.ENGLISH; "ur" -> TranslateLanguage.URDU
+            "hi" -> TranslateLanguage.HINDI; "bn" -> TranslateLanguage.BENGALI
+            "pa" -> "pa"; "gu" -> "gu"; "ta" -> "ta"; "te" -> "te"
+            "kn" -> "kn"; "ml" -> "ml"; "mr" -> "mr"; "ne" -> "ne"; "si" -> "si"
             else -> null
         }
     }
@@ -187,10 +164,8 @@ class ScreenCaptureService : Service() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(channel)
         val notification = Notification.Builder(this, "AlinGoChannel")
-            .setContentTitle("AlinGo Translate")
-            .setContentText("Tap floating ball to translate")
-            .setSmallIcon(android.R.drawable.ic_menu_camera)
-            .build()
+            .setContentTitle("AlinGo Translate").setContentText("Tap floating logo to translate")
+            .setSmallIcon(android.R.drawable.ic_menu_camera).build()
         startForeground(1, notification)
     }
 
