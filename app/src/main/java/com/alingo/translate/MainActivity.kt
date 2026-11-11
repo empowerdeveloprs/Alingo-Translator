@@ -6,7 +6,9 @@ import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.view.Gravity
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,18 +36,28 @@ class MainActivity : AppCompatActivity() {
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(60, 120, 60, 60)
+            setPadding(60, 80, 60, 60)
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+
+        // لوگو یہاں دکھائیں گے
+        val logoImage = ImageView(this).apply {
+            setImageResource(R.drawable.ic_alingo_logo)
+            layoutParams = LinearLayout.LayoutParams(500, 350)
+            setPadding(0, 0, 0, 20)
         }
 
         val title = TextView(this).apply {
             text = "AlinGo Translate"
             textSize = 32f
-            setPadding(0, 0, 0, 20)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 10)
         }
 
         val subtitle = TextView(this).apply {
-            text = "Tap floating 'A' button on screen to translate."
+            text = "Tap the floating logo on screen to translate."
             textSize = 16f
+            gravity = Gravity.CENTER
             setPadding(0, 0, 0, 40)
         }
 
@@ -84,6 +96,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        layout.addView(logoImage)
         layout.addView(title)
         layout.addView(subtitle)
         layout.addView(btnDict)
@@ -93,6 +106,6 @@ class MainActivity : AppCompatActivity() {
         layout.addView(btnOverlay)
         layout.addView(btnStart)
 
-        setContentView(layout)
+        setContentView(ScrollView(this).apply { addView(layout) })
     }
 }

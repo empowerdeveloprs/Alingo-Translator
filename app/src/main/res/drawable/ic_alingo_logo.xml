@@ -1,0 +1,41 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1000"
+    android:viewportHeight="700">
+    
+    <!-- Green Left Shield/Shape -->
+    <path
+        android:fillColor="#00C853"
+        android:pathData="M100,450 C100,250 250,200 450,250 C500,270 520,320 480,400 C420,500 300,450 300,450 L300,550 L100,550 Z" />
+    <path
+        android:fillColor="#009624"
+        android:pathData="M100,450 C100,250 250,200 450,250 L400,300 C250,250 150,300 150,450 Z" />
+
+    <!-- Green Right Wing -->
+    <path
+        android:fillColor="#00E676"
+        android:pathData="M480,400 C550,350 600,250 800,100 C700,200 680,280 620,350 C550,420 500,450 480,400 Z" />
+
+    <!-- Golden Sphere (Head) -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M550,150 C580,150 600,170 600,200 C600,230 580,250 550,250 C520,250 500,230 500,200 C500,170 520,150 550,150 Z" />
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M510,190 C510,170 530,155 550,155 C570,155 585,165 590,180 C570,175 530,175 510,190 Z" />
+
+    <!-- Golden Right D-Shape -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M700,250 C850,250 900,400 850,500 C800,600 650,600 600,500 L700,450 C750,500 800,450 800,400 C800,350 750,320 700,320 Z" />
+    
+    <!-- Golden Bottom Swoosh -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M350,550 C450,450 550,500 600,500 C700,500 800,450 850,500 C800,600 650,600 500,600 C400,600 350,580 350,550 Z" />
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M350,550 L600,500 C500,500 400,500 350,550 Z" />
+
+</vector>

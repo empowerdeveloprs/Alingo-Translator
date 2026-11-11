@@ -7,11 +7,11 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.abs
@@ -20,7 +20,7 @@ data class TranslationOverlay(val text: String, val x: Int, val y: Int, val widt
 
 class OverlayManager(private val context: Context) {
     private var windowManager: WindowManager? = null
-    private var floatingBall: TextView? = null
+    private var floatingBall: ImageView? = null
     private var ballParams: WindowManager.LayoutParams? = null
     private val translationViews = mutableListOf<TextView>()
     private var ttsManager: TtsManager? = null
@@ -33,20 +33,17 @@ class OverlayManager(private val context: Context) {
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         ttsManager = TtsManager(context)
 
-        floatingBall = TextView(context).apply {
-            text = "A"
-            textSize = 20f
-            setTextColor(Color.WHITE)
-            setTypeface(null, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            val bg = GradientDrawable()
-            bg.shape = GradientDrawable.OVAL
-            bg.setColor(Color.parseColor("#E91E63"))
-            this.background = bg
+        // یہاں ہم نے TextView کی جگہ ImageView استعمال کیا ہے
+        floatingBall = ImageView(context).apply {
+            setImageResource(R.drawable.ic_alingo_logo)
+            // لوگو کو گول کرنے کے لیے
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setBackgroundColor(Color.parseColor("#E6000000")) // نیم شفاف سیاہ بیک گراؤنڈ
+            setPadding(15, 15, 15, 15)
         }
 
         ballParams = WindowManager.LayoutParams(
-            120, 120,
+            140, 140, // تھوڑا بڑا سائز تاکہ لوگو صاف نظر آئے
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
@@ -91,9 +88,7 @@ class OverlayManager(private val context: Context) {
         val density = context.resources.displayMetrics.density
         val fontScale = SettingsManager.getFontScale(context)
         val bgOpacity = SettingsManager.getBgOpacity(context)
-        
-        // Hex color with dynamic alpha for background
-        val bgColor = Color.argb(bgOpacity, 0, 0, 0) // Black with custom transparency
+        val bgColor = Color.argb(bgOpacity, 0, 0, 0)
 
         blocks.forEach { block ->
             if (block.text.isBlank()) return@forEach
@@ -102,26 +97,18 @@ class OverlayManager(private val context: Context) {
                 text = block.text
                 setTextColor(Color.WHITE)
                 setTypeface(Typeface.DEFAULT_BOLD, Typeface.BOLD)
-                setBackgroundColor(bgColor) // اپلائی کیا گیا شفاف رنگ
+                setBackgroundColor(bgColor)
                 setPadding(8, 6, 8, 6)
                 gravity = Gravity.CENTER
-                
-                // اپلائی کیا گیا فونٹ سائز
                 val baseSizeSp = (block.height / density * 0.55f).coerceIn(10f, 22f)
                 textSize = baseSizeSp * fontScale
                 maxLines = 6
                 
-                // ٹیپ پر آواز
-                setOnClickListener {
-                    ttsManager?.speak(block.text, targetLangCode)
-                }
-
-                // لانگ پریس پر کاپی
+                setOnClickListener { ttsManager?.speak(block.text, targetLangCode) }
                 setOnLongClickListener {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clip = ClipData.newPlainText("AlinGo Translation", block.text)
-                    clipboard.setPrimaryClip(clip)
-                    Toast.makeText(context, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
+                    clipboard.setPrimaryClip(ClipData.newPlainText("AlinGo", block.text))
+                    Toast.makeText(context, "Copied!", Toast.LENGTH_SHORT).show()
                     true
                 }
             }
