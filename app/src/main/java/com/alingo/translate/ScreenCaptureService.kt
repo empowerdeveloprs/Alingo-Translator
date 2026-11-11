@@ -60,6 +60,15 @@ class ScreenCaptureService : Service() {
                 }
             }
         }
+        overlayManager?.onWordSelectMode = {
+            overlayManager?.showWordSelectorBox { x, y, w, h ->
+                if (!isProcessing) {
+                    isProcessing = true
+                    overlayManager?.clearTranslationBlocks()
+                    captureWordArea(x, y, w, h)
+                }
+            }
+        }
         overlayManager?.showFloatingBall()
 
         // اگر میڈیا پروجیکشن کی اجازت پہلے سے موجود ہے
