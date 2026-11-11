@@ -86,7 +86,14 @@ class ScreenCaptureService : Service() {
         bitmap.copyPixelsFromBuffer(buffer)
         image.close()
 
-        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        val ocrLang = SettingsManager.getOcrLang(this)
+        val recognizer = when (ocrLang) {
+            "chinese" -> TextRecognition.getClient(com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions.Builder().build())
+            "japanese" -> TextRecognition.getClient(com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions.Builder().build())
+            "korean" -> TextRecognition.getClient(com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions.Builder().build())
+            "devanagari" -> TextRecognition.getClient(com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions.Builder().build())
+            else -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        }
 
         recognizer.process(InputImage.fromBitmap(bitmap, 0))
             .addOnSuccessListener { visionText ->
@@ -118,7 +125,7 @@ class ScreenCaptureService : Service() {
 
         // اگر ماڈل موجود ہے تو ترجمہ کریں
         val options = TranslatorOptions.Builder()
-            .setSourceLanguage(TranslateLanguage.ENGLISH)
+            .setSourceLanguage(toMlKitCode(SettingsManager.getSourceLang(this)) ?: TranslateLanguage.ENGLISH)
             .setTargetLanguage(toMlKitCode(targetCode) ?: TranslateLanguage.URDU)
             .build()
         val translator = Translation.getClient(options)
