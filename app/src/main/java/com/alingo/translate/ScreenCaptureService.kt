@@ -21,11 +21,7 @@ import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
-import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
-import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
 
 class ScreenCaptureService : Service() {
     private var mediaProjection: MediaProjection? = null
@@ -90,15 +86,7 @@ class ScreenCaptureService : Service() {
         bitmap.copyPixelsFromBuffer(buffer)
         image.close()
 
-        // OCR زبان کا انتخاب
-        val ocrLang = SettingsManager.getOcrLang(this)
-        val recognizer = when (ocrLang) {
-            "chinese" -> TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
-            "japanese" -> TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
-            "korean" -> TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
-            "devanagari" -> TextRecognition.getClient(DevanagariTextRecognizerOptions.Builder().build())
-            else -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-        }
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
         recognizer.process(InputImage.fromBitmap(bitmap, 0))
             .addOnSuccessListener { visionText ->
@@ -110,15 +98,28 @@ class ScreenCaptureService : Service() {
     }
 
     private fun translateBlocks(blocks: List<com.google.mlkit.vision.text.Text.TextBlock>) {
-        val sourceCode = SettingsManager.getSourceLang(this)
         val targetCode = SettingsManager.getTargetLang(this)
 
-        val mlSource = if (sourceCode == "auto" || sourceCode == "en") TranslateLanguage.ENGLISH else toMlKitCode(sourceCode) ?: TranslateLanguage.ENGLISH
-        val mlTarget = toMlKitCode(targetCode) ?: TranslateLanguage.URDU
+        // چیک کریں کہ ٹارگٹ زبان کا ماڈل موجود ہے یا نہیں
+        if (!LanguageModelManager.isLanguageDownloaded(this, targetCode) && targetCode != "en") {
+            // اگر موجود نہیں ہے تو ڈائیلاگ دکھائیں (یہ UI تھریڈ پر ہونا چاہیے)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                DownloadPermissionDialog.show(this, targetCode) {
+                    // صارف نے اجازت دی، ڈاؤن لوڈ کریں
+                    LanguageModelManager.downloadLanguage(this, targetCode,
+                        onSuccess = { /* اب ترجمہ کریں */ },
+                        onError = { /* ایرر دکھائیں */ }
+                    )
+                }
+            }
+            isProcessing = false
+            return
+        }
 
+        // اگر ماڈل موجود ہے تو ترجمہ کریں
         val options = TranslatorOptions.Builder()
-            .setSourceLanguage(mlSource)
-            .setTargetLanguage(mlTarget)
+            .setSourceLanguage(TranslateLanguage.ENGLISH)
+            .setTargetLanguage(toMlKitCode(targetCode) ?: TranslateLanguage.URDU)
             .build()
         val translator = Translation.getClient(options)
 

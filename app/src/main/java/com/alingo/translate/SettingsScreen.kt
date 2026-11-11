@@ -18,46 +18,46 @@ class SettingsScreen : AppCompatActivity() {
 
         val langNames = Languages.ALL.map { "${it.urduName} (${it.englishName})" }
 
-        // سورس زبان
-        layout.addView(TextView(this).apply { text = "Translate FROM (کس زبان سے):" })
-        val sourceSpinner = Spinner(this)
-        sourceSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, langNames)
-        sourceSpinner.setSelection(Languages.ALL.indexOfFirst { it.code == SettingsManager.getSourceLang(this) }.coerceAtLeast(0))
-        layout.addView(sourceSpinner)
-        
-        // ٹارگٹ زبان
-        layout.addView(TextView(this).apply { text = "\nTranslate TO (کس زبان میں):" })
+        // ٹارگٹ زبان (جس میں ترجمہ کرنا ہے)
+        layout.addView(TextView(this).apply { text = "Translate TO (کس زبان میں):" })
         val targetSpinner = Spinner(this)
         targetSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, langNames)
         targetSpinner.setSelection(Languages.ALL.indexOfFirst { it.code == SettingsManager.getTargetLang(this) }.coerceAtLeast(0))
         layout.addView(targetSpinner)
 
-        // OCR زبان
-        layout.addView(TextView(this).apply { text = "\nOCR Script (اسکرین پر کون سی زبان ہے؟):" })
-        val ocrSpinner = Spinner(this)
-        val ocrOptions = listOf("Latin (English/Urdu Roman)", "Chinese", "Japanese", "Korean", "Devanagari (Hindi/Marathi)")
-        val ocrCodes = listOf("latin", "chinese", "japanese", "korean", "devanagari")
-        ocrSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, ocrOptions)
-        ocrSpinner.setSelection(ocrCodes.indexOf(SettingsManager.getOcrLang(this)).coerceAtLeast(0))
-        layout.addView(ocrSpinner)
-
-        // فونٹ اور بیک گراؤنڈ سلائیڈرز
-        layout.addView(TextView(this).apply { text = "\nFont Size (فونٹ سائز):" })
-        val fontSeekBar = SeekBar(this).apply { max = 20; progress = ((SettingsManager.getFontScale(this@SettingsScreen) - 0.5f) * 10).toInt() }
-        layout.addView(fontSeekBar)
-
-        layout.addView(TextView(this).apply { text = "\nBackground Opacity (پس منظر):" })
-        val opacitySeekBar = SeekBar(this).apply { max = 255; progress = SettingsManager.getBgOpacity(this@SettingsScreen) }
-        layout.addView(opacitySeekBar)
+        // زبان منتخب کرنے پر فوری چیک
+        targetSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                val selectedLangCode = Languages.ALL[position].code
+                // اگر زبان ڈاؤن لوڈ نہیں ہے تو ڈائیلاگ دکھائیں
+                if (!LanguageModelManager.isLanguageDownloaded(this@SettingsScreen, selectedLangCode)) {
+                    DownloadPermissionDialog.show(this@SettingsScreen, selectedLangCode) {
+                        // صارف نے "ہاں" کہا، ڈاؤن لوڈ شروع کریں
+                        Toast.makeText(this@SettingsScreen, "Downloading model...", Toast.LENGTH_SHORT).show()
+                        LanguageModelManager.downloadLanguage(
+                            this@SettingsScreen,
+                            selectedLangCode,
+                            onSuccess = {
+                                runOnUiThread {
+                                    Toast.makeText(this@SettingsScreen, "Download complete!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onError = { error ->
+                                runOnUiThread {
+                                    Toast.makeText(this@SettingsScreen, error, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
 
         val saveBtn = Button(this).apply {
             text = "💾 Save Settings"
             setOnClickListener {
-                SettingsManager.setSourceLang(this@SettingsScreen, Languages.ALL[sourceSpinner.selectedItemPosition].code)
                 SettingsManager.setTargetLang(this@SettingsScreen, Languages.ALL[targetSpinner.selectedItemPosition].code)
-                SettingsManager.setOcrLang(this@SettingsScreen, ocrCodes[ocrSpinner.selectedItemPosition])
-                SettingsManager.setFontScale(this@SettingsScreen, 0.5f + (fontSeekBar.progress / 10f))
-                SettingsManager.setBgOpacity(this@SettingsScreen, opacitySeekBar.progress)
                 Toast.makeText(this@SettingsScreen, "Saved!", Toast.LENGTH_SHORT).show()
                 finish()
             }
