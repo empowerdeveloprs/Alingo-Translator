@@ -4,62 +4,85 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
+import kotlin.math.abs
+
+data class TranslationOverlay(
+    val text: String,
+    val x: Int,
+    val y: Int,
+    val width: Int,
+    val height: Int
+)
 
 class OverlayManager(private val context: Context) {
     private var windowManager: WindowManager? = null
-    private var floatingView: TextView? = null
-    private var params: WindowManager.LayoutParams? = null
+    private var floatingBall: TextView? = null
+    private var ballParams: WindowManager.LayoutParams? = null
+    private val translationViews = mutableListOf<TextView>()
+
+    var onBallClicked: (() -> Unit)? = null
 
     @SuppressLint("ClickableViewAccessibility")
-    fun showOverlay(initialText: String) {
-        if (floatingView != null) return
-
+    fun showFloatingBall() {
+        if (floatingBall != null) return
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        
-        floatingView = TextView(context).apply {
-            text = initialText
-            textSize = 18f
+
+        floatingBall = TextView(context).apply {
+            text = "A"
+            textSize = 20f
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#CC000000"))
-            setPadding(30, 30, 30, 30)
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            val bg = GradientDrawable()
+            bg.shape = GradientDrawable.OVAL
+            bg.setColor(Color.parseColor("#E91E63"))
+            this.background = bg
         }
 
-        params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+        ballParams = WindowManager.LayoutParams(
+            120, 120,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 100
-            y = 300
+            x = 100; y = 300
         }
 
-        // باکس کو ڈریگ (Move) کرنے کا لاجک
-        floatingView?.setOnTouchListener(object : android.view.View.OnTouchListener {
+        floatingBall?.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
             private var initialTouchX = 0f
             private var initialTouchY = 0f
+            private var isDragging = false
 
-            override fun onTouch(v: android.view.View, event: MotionEvent): Boolean {
+            override fun onTouch(v: View, event: MotionEvent): Boolean {
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        initialX = params!!.x
-                        initialY = params!!.y
+                        initialX = ballParams!!.x
+                        initialY = ballParams!!.y
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
+                        isDragging = false
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        params!!.x = initialX + (event.rawX - initialTouchX).toInt()
-                        params!!.y = initialY + (event.rawY - initialTouchY).toInt()
-                        windowManager?.updateViewLayout(floatingView, params)
+                        if (abs(event.rawX - initialTouchX) > 10 || abs(event.rawY - initialTouchY) > 10)
+                            isDragging = true
+                        ballParams!!.x = initialX + (event.rawX - initialTouchX).toInt()
+                        ballParams!!.y = initialY + (event.rawY - initialTouchY).toInt()
+                        windowManager?.updateViewLayout(floatingBall, ballParams)
+                        return true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (!isDragging) onBallClicked?.invoke()
                         return true
                     }
                 }
@@ -67,10 +90,67 @@ class OverlayManager(private val context: Context) {
             }
         })
 
-        windowManager?.addView(floatingView, params)
+        windowManager?.addView(floatingBall, ballParams)
     }
 
-    fun updateText(newText: String) {
-        floatingView?.post { floatingView?.text = newText }
+    /**
+     * اصل ٹیکسٹ کے ہر بلاک (جملے) کے بالکل اوپر بولڈ فونٹ میں ترجمہ چسپاں کریں۔
+     */
+    fun showTranslationBlocks(blocks: List<TranslationOverlay>) {
+        val wm = windowManager ?: return
+        clearTranslationBlocks()
+
+        val density = context.resources.displayMetrics.density
+
+        blocks.forEach { block ->
+            if (block.text.isBlank()) return@forEach
+
+            val tv = TextView(context).apply {
+                text = block.text
+                setTextColor(Color.WHITE)
+                // بولڈ فونٹ
+                setTypeface(Typeface.DEFAULT_BOLD, Typeface.BOLD)
+                // نیم شفاف سیاہ پس منظر تاکہ اصل ٹیکسٹ چھپ جائے
+                setBackgroundColor(Color.parseColor("#E6000000"))
+                setPadding(8, 6, 8, 6)
+                gravity = Gravity.CENTER
+                // سائز باکس کی اونچائی کے مطابق
+                val sizeSp = (block.height / density * 0.55f).coerceIn(10f, 22f)
+                textSize = sizeSp
+                maxLines = 4
+            }
+
+            val params = WindowManager.LayoutParams(
+                block.width,
+                block.height,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+                x = block.x
+                y = block.y
+            }
+
+            try {
+                wm.addView(tv, params)
+                translationViews.add(tv)
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun clearTranslationBlocks() {
+        val wm = windowManager ?: return
+        translationViews.forEach {
+            try { wm.removeView(it) } catch (_: Exception) {}
+        }
+        translationViews.clear()
+    }
+
+    fun removeOverlays() {
+        floatingBall?.let { try { windowManager?.removeView(it) } catch (_: Exception) {} }
+        floatingBall = null
+        clearTranslationBlocks()
     }
 }

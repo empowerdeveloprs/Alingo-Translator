@@ -22,13 +22,15 @@ import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import java.io.ByteArrayOutputStream
 
 class ScreenCaptureService : Service() {
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
     private var overlayManager: OverlayManager? = null
+
+    // ہم اسکرین کو آدھی ریزولوشن پر پکڑیں گے (تیز رفتار کے لیے)
+    private val scaleFactor = 2
     private var isProcessing = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -36,109 +38,121 @@ class ScreenCaptureService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForegroundService()
         overlayManager = OverlayManager(this)
-        overlayManager?.showOverlay("AlinGo: Processing...")
+        overlayManager?.onBallClicked = {
+            if (!isProcessing) {
+                isProcessing = true
+                overlayManager?.clearTranslationBlocks()
+                takeScreenshotAndTranslate()
+            }
+        }
+        overlayManager?.showFloatingBall()
 
         val resultCode = intent?.getIntExtra("RESULT_CODE", 0) ?: 0
         val data = intent?.getParcelableExtra<Intent>("DATA")
-        val mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        
-        if (data != null) {
-            mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, data)
-            startScreenCapture()
-        }
+        val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
+        if (data != null) {
+            mediaProjection = mpm.getMediaProjection(resultCode, data)
+            setupVirtualDisplay()
+        }
         return START_NOT_STICKY
     }
 
-    private fun startScreenCapture() {
-        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private fun setupVirtualDisplay() {
+        val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val metrics = DisplayMetrics()
-        windowManager.defaultDisplay.getRealMetrics(metrics)
+        wm.defaultDisplay.getRealMetrics(metrics)
 
-        // اسکرین ریزولوشن کو تھوڑا کم کرتے ہیں تاکہ پروسیسنگ تیز ہو
-        val width = metrics.widthPixels / 2
-        val height = metrics.heightPixels / 2
+        val width = metrics.widthPixels / scaleFactor
+        val height = metrics.heightPixels / scaleFactor
 
         imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
-        
+
         virtualDisplay = mediaProjection?.createVirtualDisplay(
             "AlinGoCapture", width, height, metrics.densityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
             imageReader?.surface, null, null
         )
-
-        // ہر 2 سیکنڈ بعد تصویر پکڑ کر پروسیس کریں
-        imageReader?.setOnImageAvailableListener({ reader ->
-            if (isProcessing) {
-                reader.acquireLatestImage()?.close()
-                return@setOnImageAvailableListener
-            }
-            
-            val image = reader.acquireLatestImage()
-            if (image != null) {
-                isProcessing = true
-                val planes = image.planes
-                val buffer = planes[0].buffer
-                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                bitmap.copyPixelsFromBuffer(buffer)
-                image.close()
-
-                processImage(bitmap)
-            }
-        }, null)
     }
 
-    private fun processImage(bitmap: Bitmap) {
-        val image = InputImage.fromBitmap(bitmap, 0)
+    private fun takeScreenshotAndTranslate() {
+        val image = imageReader?.acquireLatestImage()
+        if (image == null) {
+            isProcessing = false
+            return
+        }
+
+        val width = image.width
+        val height = image.height
+        val planes = image.planes
+        val buffer = planes[0].buffer
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        bitmap.copyPixelsFromBuffer(buffer)
+        image.close()
+
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-        recognizer.process(image)
+        recognizer.process(InputImage.fromBitmap(bitmap, 0))
             .addOnSuccessListener { visionText ->
-                val extractedText = visionText.text
-                if (extractedText.isNotBlank()) {
-                    // انگلش سے اردو میں ترجمہ کریں
-                    translateText(extractedText)
-                } else {
+                val textBlocks = visionText.textBlocks.filter { it.boundingBox != null && it.text.isNotBlank() }
+                if (textBlocks.isEmpty()) {
                     isProcessing = false
+                    return@addOnSuccessListener
                 }
+                translateBlocks(textBlocks)
             }
-            .addOnFailureListener {
-                isProcessing = false
-            }
+            .addOnFailureListener { isProcessing = false }
     }
 
-    private fun translateText(text: String) {
+    private fun translateBlocks(blocks: List<com.google.mlkit.vision.text.Text.TextBlock>) {
         val options = TranslatorOptions.Builder()
             .setSourceLanguage(TranslateLanguage.ENGLISH)
-            .setTargetLanguage(TranslateLanguage.URDU) // اردو میں ترجمہ
+            .setTargetLanguage(TranslateLanguage.URDU)
             .build()
         val translator = Translation.getClient(options)
 
-        // ترجمہ کرنے سے پہلے ماڈل ڈاؤن لوڈ ہونا ضروری ہے (یہ ایک بار ہوگا)
-        translator.downloadModelIfNeeded()
-            .addOnSuccessListener {
-                translator.translate(text)
-                    .addOnSuccessListener { translatedText ->
-                        overlayManager?.updateText(translatedText)
-                        isProcessing = false
+        translator.downloadModelIfNeeded().addOnSuccessListener {
+            val results = mutableListOf<TranslationOverlay>()
+            var completed = 0
+            val total = blocks.size
+
+            blocks.forEach { block ->
+                val rect = block.boundingBox!!
+                translator.translate(block.text)
+                    .addOnSuccessListener { translated ->
+                        results.add(
+                            TranslationOverlay(
+                                text = translated,
+                                x = rect.left * scaleFactor,
+                                y = rect.top * scaleFactor,
+                                width = rect.width() * scaleFactor,
+                                height = rect.height() * scaleFactor
+                            )
+                        )
+                        completed++
+                        if (completed == total) {
+                            overlayManager?.showTranslationBlocks(results)
+                            isProcessing = false
+                        }
                     }
                     .addOnFailureListener {
-                        isProcessing = false
+                        completed++
+                        if (completed == total) {
+                            overlayManager?.showTranslationBlocks(results)
+                            isProcessing = false
+                        }
                     }
             }
-            .addOnFailureListener {
-                isProcessing = false
-            }
+        }.addOnFailureListener { isProcessing = false }
     }
 
     private fun startForegroundService() {
         val channel = NotificationChannel("AlinGoChannel", "AlinGo Service", NotificationManager.IMPORTANCE_LOW)
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(channel)
-
         val notification = Notification.Builder(this, "AlinGoChannel")
             .setContentTitle("AlinGo Translate")
-            .setContentText("Running in background...")
+            .setContentText("Tap floating ball to translate screen")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .build()
         startForeground(1, notification)
@@ -148,5 +162,6 @@ class ScreenCaptureService : Service() {
         super.onDestroy()
         virtualDisplay?.release()
         mediaProjection?.stop()
+        overlayManager?.removeOverlays()
     }
 }
