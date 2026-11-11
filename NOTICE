@@ -1,0 +1,37 @@
+AlinGo Translate
+Copyright (c) 2026 AlinGo. All Rights Reserved.
+============================================================
+
+This software is proprietary and confidential. Unauthorized copying, 
+modification, or distribution of this software, via any medium, is 
+strictly prohibited.
+
+============================================================
+THIRD-PARTY COMPONENTS
+============================================================
+This application utilizes the following third-party open-source 
+libraries and services:
+
+1. Google ML Kit (Text Recognition, Translation)
+   - Copyright (c) Google LLC
+   - Licensed under Google APIs Terms of Service
+   
+2. Android Jetpack (Compose, Lifecycle, Core)
+   - Copyright (c) The Android Open Source Project
+   - Licensed under Apache License 2.0
+
+3. Kotlin Programming Language
+   - Copyright (c) JetBrains s.r.o.
+   - Licensed under Apache License 2.0
+
+4. Shizuku API (For advanced screen capture)
+   - Copyright (c) RikkaApps
+   - Licensed under Apache License 2.0
+   - Note: No user data is collected or transmitted.
+
+============================================================
+CONTACT
+============================================================
+For licensing or business inquiries:
+Email: support@alingo.example
+Website: https://github.com/empowerdeveloprs/Alingo-Translator

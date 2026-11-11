@@ -1,0 +1,4 @@
+
+# Private Components (Not for public source)
+app/src/main/java/com/alingo/translate/agent/
+app/src/main/java/com/alingo/translate/agent/**/*

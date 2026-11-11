@@ -1,23 +1,38 @@
-AlinGo License
+AlinGo Translate — Proprietary Software License
 Version 1.0, 2026
-https://github.com/empowerdeveloprs/Alingo-Translate
 
-Copyright (c) 2026 AlinGo Developers
+Copyright (c) 2026 AlinGo. All Rights Reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. GRANT OF LICENSE (اجازت)
+AlinGo hereby grants you a personal, non-transferable, non-exclusive, 
+limited license to install and use the AlinGo Translate application 
+(the "Software") on your Android device for personal, non-commercial use.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+2. RESTRICTIONS (پابندیاں)
+You may NOT:
+  a) Copy, modify, adapt, translate, or create derivative works of the Software.
+  b) Reverse engineer, decompile, disassemble, or attempt to derive the source code.
+  c) Distribute, sublicense, rent, lease, lend, or sell the Software.
+  d) Remove, alter, or obscure any proprietary notices or trademarks.
+  e) Use the Software for any commercial purpose without explicit written permission.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+3. OWNERSHIP (ملکیت)
+The Software is licensed, not sold. AlinGo retains all right, title, and 
+interest in and to the Software, including all intellectual property rights.
+
+4. NO WARRANTY (کوئی ضمانت نہیں)
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL 
+THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY.
+
+5. TERMINATION (اختتام)
+This license is effective until terminated. Your rights under this license 
+will terminate automatically without notice if you fail to comply with any 
+term(s) of this license. Upon termination, you must cease all use of the Software.
+
+6. THIRD-PARTY COMPONENTS (تھرڈ پارٹی حصے)
+The Software includes open-source libraries (e.g., ML Kit, Jetpack) which 
+are governed by their respective licenses. See the NOTICE file for details.
+
+For permissions or inquiries, contact: support@alingo.example
