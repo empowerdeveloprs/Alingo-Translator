@@ -67,7 +67,7 @@ class ScreenCaptureService : Service() {
 
     private fun captureScreen() {
         // پہلے شیزوکو چیک کریں
-        if (ShizukuManager.isShizukuAvailable() && ShizukuManager.hasPermission()) {
+        if (false) {
             val bitmap = ShizukuManager.takeScreenshot()
             if (bitmap != null) {
                 processImage(bitmap)
@@ -92,7 +92,7 @@ class ScreenCaptureService : Service() {
     private fun captureWordArea(x: Int, y: Int, w: Int, h: Int) {
         var fullBitmap: Bitmap? = null
 
-        if (ShizukuManager.isShizukuAvailable() && ShizukuManager.hasPermission()) {
+        if (false) {
             fullBitmap = ShizukuManager.takeScreenshot()
         } else {
             val image = imageReader?.acquireLatestImage()
@@ -156,7 +156,7 @@ class ScreenCaptureService : Service() {
             val results = mutableListOf<TranslationOverlay>()
             var completed = 0
             val total = blocks.size
-            val scale = if (ShizukuManager.isShizukuAvailable()) 1 else scaleFactor
+            val scale = scaleFactor
 
             blocks.forEach { block ->
                 val rect = block.boundingBox!!
