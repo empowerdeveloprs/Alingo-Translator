@@ -57,25 +57,13 @@ class ScreenCaptureService : Service() {
         
         overlayManager?.showFloatingBall()
 
-        // صرف میڈیا پروجیکشن سیٹ اپ کریں اگر شیزوکو موجود نہیں ہے
-        if (!ShizukuManager.isShizukuAvailable() || !ShizukuManager.hasPermission()) {
-            setupMediaProjection(intent)
-        }
+        // میڈیا پروجیکشن سیٹ اپ کریں (صرف ٹرانسلیٹر کے لیے)
+        setupMediaProjection(intent)
 
         return START_NOT_STICKY
     }
 
     private fun captureScreen() {
-        // پہلے شیزوکو چیک کریں
-        if (false) {
-            val bitmap = ShizukuManager.takeScreenshot()
-            if (bitmap != null) {
-                processImage(bitmap)
-                return
-            }
-        }
-
-        // اگر شیزوکو نہیں ہے تو میڈیا پروجیکشن استعمال کریں
         val image = imageReader?.acquireLatestImage()
         if (image == null) { isProcessing = false; return }
 
@@ -86,34 +74,27 @@ class ScreenCaptureService : Service() {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.copyPixelsFromBuffer(buffer)
         image.close()
+        
         processImage(bitmap)
     }
 
     private fun captureWordArea(x: Int, y: Int, w: Int, h: Int) {
-        var fullBitmap: Bitmap? = null
+        val image = imageReader?.acquireLatestImage()
+        if (image == null) { isProcessing = false; return }
 
-        if (false) {
-            fullBitmap = ShizukuManager.takeScreenshot()
-        } else {
-            val image = imageReader?.acquireLatestImage()
-            if (image != null) {
-                val width = image.width
-                val height = image.height
-                val planes = image.planes
-                val buffer = planes[0].buffer
-                fullBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                fullBitmap.copyPixelsFromBuffer(buffer)
-                image.close()
-            }
-        }
+        val fullWidth = image.width
+        val fullHeight = image.height
+        val planes = image.planes
+        val buffer = planes[0].buffer
+        val fullBitmap = Bitmap.createBitmap(fullWidth, fullHeight, Bitmap.Config.ARGB_8888)
+        fullBitmap.copyPixelsFromBuffer(buffer)
+        image.close()
 
-        if (fullBitmap == null) { isProcessing = false; return }
-
-        val scale = if (ShizukuManager.isShizukuAvailable()) 1f else scaleFactor.toFloat()
-        val cropX = (x / scale).toInt().coerceIn(0, fullBitmap.width - 1)
-        val cropY = (y / scale).toInt().coerceIn(0, fullBitmap.height - 1)
-        val cropW = (w / scale).toInt().coerceIn(1, fullBitmap.width - cropX)
-        val cropH = (h / scale).toInt().coerceIn(1, fullBitmap.height - cropY)
+        val scale = scaleFactor.toFloat()
+        val cropX = (x / scale).toInt().coerceIn(0, fullWidth - 1)
+        val cropY = (y / scale).toInt().coerceIn(0, fullHeight - 1)
+        val cropW = (w / scale).toInt().coerceIn(1, fullWidth - cropX)
+        val cropH = (h / scale).toInt().coerceIn(1, fullHeight - cropY)
 
         val croppedBitmap = Bitmap.createBitmap(fullBitmap, cropX, cropY, cropW, cropH)
         
