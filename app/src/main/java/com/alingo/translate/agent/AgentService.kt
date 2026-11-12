@@ -26,9 +26,6 @@ class AgentService : Service() {
         .build()
 
     // ⚠️ یہاں اپنے سرور کا IP یا URL ڈالیں
-    // اگر آپ ٹرمکس میں لوکل چلا رہے ہیں اور فون اسی وائی فائی پر ہے:
-    // تو اپنے PC/ٹرمکس کا IP ڈالیں (مثلاً: http://10.241.253.40:5000)
-    // اگر کلاؤڈ پر ہے تو: https://your-server.com
     private val serverUrl = "http://10.241.253.40:5000"
     
     private val deviceId = "android-" + Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
